@@ -25,6 +25,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingDog from '../components/LoadingDog';
 import PasswordVisibilityIcon from '../components/PasswordVisibilityIcon';
 import PressableScale from '../components/PressableScale';
+import { biometriaDisponivel, autenticarBiometria } from '../lib/biometricAuth';
+import { faceLoginAtivado, salvarSenhaConta, lerSenhaConta, apagarSenhaConta, temSenhaConta } from '../lib/faceLogin';
 import { t, useI18n } from '../i18n';
 
 const DEFAULT_AVATAR_COLOR = '#0A84FF';
@@ -83,6 +85,9 @@ export default function AccountHubScreen({ navigation }) {
   const [loginError, setLoginError] = useState(null);
   const [rawError, setRawError] = useState(null);
   const [removeConfirmEmail, setRemoveConfirmEmail] = useState(null);
+  // Conta selecionada tem Face ID disponível (feature ligada + biometria no
+  // aparelho + senha guardada) → mostra o botão e dispara o Face ID ao abrir.
+  const [faceDisponivelConta, setFaceDisponivelConta] = useState(false);
 
   // Este sheet não tem ScrollView (o conteúdo é uma View só), então não dá pra
   // contar com o automaticallyAdjustKeyboardInsets: quem tira o campo de senha
@@ -101,12 +106,23 @@ export default function AccountHubScreen({ navigation }) {
     setLoginError(null);
     setRawError(null);
     setShowPassword(false);
+    setFaceDisponivelConta(false);
     sheetTranslateY.setValue(320);
     overlayOpacity.setValue(0);
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       Animated.spring(sheetTranslateY, { toValue: 0, useNativeDriver: true, tension: 68, friction: 11 }),
     ]).start();
+    // Face ID: se a feature está ligada, o aparelho tem biometria e essa conta
+    // tem senha guardada → mostra o botão e já dispara o Face ID. A senha fica
+    // como fallback (se cancelar o Face ID ou ele falhar).
+    (async () => {
+      if (!faceLoginAtivado()) return;
+      if (!(await biometriaDisponivel())) return;
+      if (!(await temSenhaConta(account.email))) return;
+      setFaceDisponivelConta(true);
+      tentarFaceId(account);
+    })();
   };
 
   const closeModal = () => {
@@ -164,6 +180,16 @@ export default function AccountHubScreen({ navigation }) {
     })
   ).current;
 
+  // Guarda a senha no Keychain pra próxima entrada por Face ID — só se a feature
+  // está ligada e o aparelho tem biometria. Silencioso.
+  const guardarSenhaSePossivel = async (email, pw) => {
+    try {
+      if (faceLoginAtivado() && (await biometriaDisponivel())) {
+        await salvarSenhaConta(email, pw);
+      }
+    } catch (e) {}
+  };
+
   const handleQuickLogin = async () => {
     if (!password) { setLoginError(t('auth.err.passwordEmpty')); return; }
     setIsLoading(true);
@@ -171,11 +197,37 @@ export default function AccountHubScreen({ navigation }) {
     setRawError(null);
     try {
       const data = await apiLogin({ email: selectedAccount.email, password });
+      await guardarSenhaSePossivel(selectedAccount.email, password);
       authLogin(data.access_token, data.user, data.refresh_token);
     } catch (error) {
       setLoginError(getApiErrorMessage(error));
       setRawError(error);
       setPassword('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Login por Face ID: lê a senha guardada, pede a biometria e entra. Se a senha
+  // não vale mais (trocada no servidor → 401), apaga a guardada e pede pra digitar.
+  const tentarFaceId = async (account) => {
+    const pw = await lerSenhaConta(account.email);
+    if (!pw) return;
+    const ok = await autenticarBiometria(t('auth.faceid.prompt', { name: account.name }));
+    if (!ok) return; // cancelou → usa o campo de senha
+    setIsLoading(true);
+    setLoginError(null);
+    setRawError(null);
+    try {
+      const data = await apiLogin({ email: account.email, password: pw });
+      authLogin(data.access_token, data.user, data.refresh_token);
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        await apagarSenhaConta(account.email); // senha guardada ficou velha
+        setFaceDisponivelConta(false);
+      }
+      setLoginError(getApiErrorMessage(error));
+      setRawError(error);
     } finally {
       setIsLoading(false);
     }
@@ -262,6 +314,19 @@ export default function AccountHubScreen({ navigation }) {
 
                 <ErrorBanner message={loginError} error={rawError} />
 
+                {faceDisponivelConta && (
+                  <>
+                    <PressableScale
+                      style={[styles.faceBtn, isLoading && { opacity: 0.6 }]}
+                      onPress={() => tentarFaceId(selectedAccount)}
+                      disabled={isLoading}
+                    >
+                      <Text style={styles.faceBtnText}>{t('auth.faceid.button')}</Text>
+                    </PressableScale>
+                    <Text style={styles.faceOr}>{t('auth.faceid.or')}</Text>
+                  </>
+                )}
+
                 <View style={[styles.inputWrapper, loginError && styles.inputError]}>
                   <TextInput
                     style={styles.inputInner}
@@ -312,6 +377,7 @@ export default function AccountHubScreen({ navigation }) {
         destructive
         onCancel={() => setRemoveConfirmEmail(null)}
         onConfirm={() => {
+          apagarSenhaConta(removeConfirmEmail); // some com a senha guardada no Keychain
           removeSavedAccount(removeConfirmEmail);
           setRemoveConfirmEmail(null);
         }}
@@ -533,6 +599,28 @@ function makeStyles(theme, insets = { top: 0 }) {
       fontSize: 16,
       fontWeight: '700',
       fontFamily: 'System',
+    },
+    faceBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      paddingVertical: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 52,
+      marginBottom: 14,
+    },
+    faceBtnText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      fontFamily: 'System',
+    },
+    faceOr: {
+      textAlign: 'center',
+      color: theme.textSecondary,
+      fontSize: 13,
+      fontFamily: 'System',
+      marginBottom: 14,
     },
   });
 }

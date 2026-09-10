@@ -76,6 +76,13 @@ export default {
 
     // Conta
     'auth.account.defaultName': 'Usuário',
+    'auth.account.faceid': 'Entrar com Face ID',
+    'auth.account.faceidHint': 'Usa o Face ID pra entrar sem digitar a senha quando a sessão cair. Se falhar, é só usar a senha.',
+    'auth.account.faceidReady': 'Senha guardada — Face ID pronto pra próxima vez.',
+    'auth.account.faceidNeedsLogin': 'Falta armar: saia e entre uma vez digitando a senha (é esse login que guarda a senha).',
+    'auth.faceid.button': 'Entrar com Face ID',
+    'auth.faceid.or': 'ou entre com a senha',
+    'auth.faceid.prompt': 'Entrar como {name}',
     'auth.account.changePassword': 'Alterar senha',
     'auth.account.deleteAccount': 'Excluir conta',
     'auth.account.logout': 'Sair',
@@ -173,6 +180,13 @@ export default {
 
     // Conta
     'auth.account.defaultName': 'User',
+    'auth.account.faceid': 'Sign in with Face ID',
+    'auth.account.faceidHint': 'Use Face ID to sign back in without typing your password when the session drops. If it fails, just use your password.',
+    'auth.account.faceidReady': 'Password saved — Face ID ready for next time.',
+    'auth.account.faceidNeedsLogin': 'Not armed yet: sign out and sign in once typing your password (that login is what saves it).',
+    'auth.faceid.button': 'Sign in with Face ID',
+    'auth.faceid.or': 'or sign in with your password',
+    'auth.faceid.prompt': 'Sign in as {name}',
     'auth.account.changePassword': 'Change password',
     'auth.account.deleteAccount': 'Delete account',
     'auth.account.logout': 'Log out',

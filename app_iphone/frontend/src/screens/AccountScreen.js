@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -20,6 +21,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { deleteAccount as apiDeleteAccount } from '../api/auth.api';
+import { biometriaDisponivel } from '../lib/biometricAuth';
+import { faceLoginAtivado, setFaceLoginAtivado, apagarTodasSenhas, temSenhaConta } from '../lib/faceLogin';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ChevronIcon from '../components/ChevronIcon';
 import LoadingDog from '../components/LoadingDog';
@@ -100,6 +103,30 @@ export default function AccountScreen({ navigation }) {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Face ID (login): toggle só aparece se o aparelho tem biometria.
+  const [faceOn, setFaceOn] = useState(faceLoginAtivado());
+  const [faceSupported, setFaceSupported] = useState(false);
+  const [senhaGuardada, setSenhaGuardada] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const ok = await biometriaDisponivel();
+      const tem = await temSenhaConta(user?.email);
+      if (vivo) { setFaceSupported(ok); setSenhaGuardada(tem); }
+    })();
+    return () => { vivo = false; };
+  }, [user?.email, faceOn]);
+
+  const toggleFace = async (v) => {
+    setFaceOn(v);
+    setFaceLoginAtivado(v);
+    // Desligou → apaga as senhas guardadas de todas as contas (nada de sobra
+    // no Keychain se o usuário não quer mais o Face ID).
+    if (!v) {
+      try { await apagarTodasSenhas(savedAccounts.map(a => a.email)); } catch (e) {}
+    }
+  };
 
   const currentAccount = savedAccounts.find(a => a.email === user?.email);
   const avatarColor = currentAccount?.color || AVATAR_COLORS[0];
@@ -283,6 +310,31 @@ export default function AccountScreen({ navigation }) {
               <Text style={styles.userName}>{user?.name || t('auth.account.defaultName')}</Text>
               <Text style={styles.userEmail}>{user?.email || ''}</Text>
             </View>
+
+            {faceSupported && (
+              <View style={[styles.section, { marginBottom: 12 }]}>
+                <View style={styles.menuItem}>
+                  <View style={styles.menuItemLabelWrap}>
+                    <Text style={styles.menuItemText}>{t('auth.account.faceid')}</Text>
+                    <Text style={styles.menuItemHint}>{t('auth.account.faceidHint')}</Text>
+                    {faceOn ? (
+                      <Text style={[styles.menuItemHint, { color: senhaGuardada ? theme.primary : theme.error, marginTop: 6 }]}>
+                        {senhaGuardada
+                          ? t('auth.account.faceidReady')
+                          : t('auth.account.faceidNeedsLogin')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Switch
+                    value={faceOn}
+                    onValueChange={toggleFace}
+                    trackColor={{ false: theme.border, true: theme.primary }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor={theme.border}
+                  />
+                </View>
+              </View>
+            )}
 
             <View style={styles.section}>
               <PressableScale style={styles.menuItem} onPress={() => navigation.navigate('ChangePassword')}>
@@ -504,6 +556,14 @@ function makeStyles(theme) {
       fontSize: 16,
       color: theme.textPrimary,
       fontFamily: 'System',
+    },
+    menuItemLabelWrap: { flex: 1, marginRight: 12 },
+    menuItemHint: {
+      fontSize: 12.5,
+      color: theme.textSecondary,
+      fontFamily: 'System',
+      marginTop: 3,
+      lineHeight: 17,
     },
     divider: {
       height: 1,

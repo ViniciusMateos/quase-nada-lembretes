@@ -58,6 +58,8 @@ export default {
         UIBackgroundModes: ['fetch', 'processing', 'remote-notification'],
         NSUserNotificationUsageDescription:
           'Usado para enviar lembretes no horário agendado.',
+        // Face ID: usado pra logar de volta sem digitar a senha quando a sessão cai.
+        NSFaceIDUsageDescription: 'Use o Face ID para entrar sem digitar a senha.',
         ITSAppUsesNonExemptEncryption: false,
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
@@ -72,6 +74,10 @@ export default {
     plugins: [
       'expo-dev-client',
       'expo-av',
+      // Login por Face ID (guarda a senha no Keychain via secure-store e usa a
+      // biometria pra liberar). Nativo → só vale a partir do build.
+      'expo-secure-store',
+      ['expo-local-authentication', { faceIDPermission: 'Use o Face ID para entrar sem digitar a senha.' }],
       // Empacota os sons no bundle nativo (iOS e Android res/raw) pro Notifee
       // tocar som próprio: sound-reminder = lembrete disparando (alarme);
       // sound-receive = lembrete criado / mensagem do chat (mais suave).

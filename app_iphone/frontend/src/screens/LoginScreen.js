@@ -21,6 +21,8 @@ import LoadingDog from '../components/LoadingDog';
 import PasswordVisibilityIcon from '../components/PasswordVisibilityIcon';
 import PressableScale from '../components/PressableScale';
 import useKeyboardNudge from '../utils/useKeyboardNudge';
+import { biometriaDisponivel } from '../lib/biometricAuth';
+import { faceLoginAtivado, salvarSenhaConta } from '../lib/faceLogin';
 import { t, useI18n } from '../i18n';
 
 const removeEmoji = str =>
@@ -70,7 +72,15 @@ export default function LoginScreen({ navigation }) {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      const data = await apiLogin({ email: email.trim().toLowerCase(), password });
+      const emailNorm = email.trim().toLowerCase();
+      const data = await apiLogin({ email: emailNorm, password });
+      // Guarda a senha pro Face ID (se ligado + biometria no aparelho) — assim
+      // essa conta já entra por Face ID na próxima vez que a sessão cair.
+      try {
+        if (faceLoginAtivado() && (await biometriaDisponivel())) {
+          await salvarSenhaConta(emailNorm, password);
+        }
+      } catch (e) {}
       authLogin(data.access_token, data.user, data.refresh_token);
     } catch (error) {
       setApiError(getApiErrorMessage(error));
