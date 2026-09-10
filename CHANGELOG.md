@@ -11,6 +11,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.8.0] - 2026-09-10
+
+### Adicionado
+- **Login por Face ID**: quando a sessão cai, dá pra entrar por biometria em vez de digitar a senha. Ao tocar na conta salva, o Face ID dispara e entra com a senha guardada de forma segura no Keychain (`expo-secure-store`, liberada pela biometria via `expo-local-authentication`). Campo de senha continua de fallback (cancelar/falhar); se a senha guardada não valer mais (401), apaga e pede pra digitar. Configurável em Ajustes → Conta ("Entrar com Face ID"). Exige build (deps nativas + `NSFaceIDUsageDescription`).
+
+---
+
 ## [1.7.0] - 2026-09-04
 
 ### Adicionado
