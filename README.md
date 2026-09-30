@@ -17,6 +17,8 @@ Qualquer resposta do chat também **notifica quando você não está vendo a con
 
 Quando a sessão cai, dá pra **entrar por Face ID** em vez de digitar a senha: a senha fica guardada no Keychain (liberada pela biometria) e o Face ID dispara ao tocar na conta salva — com o campo de senha sempre de fallback. Configurável em Ajustes → Conta.
 
+Tem também um **calendário** (no menu e num atalho no cabeçalho da aba de Lembretes): um feed de meses por scroll onde cada dia ganha uma bolinha — **azul** quando tem lembrete pontual, **cinza** quando só tem recorrente (a recorrência é expandida no cliente pra preencher todos os meses). Tocar num dia abre um painel com os lembretes daquele dia, separados em pontuais e recorrentes; ali dá pra **criar** (com a data já preenchida), **editar** (toque) e **excluir** (segurar) — tudo com animações de entra/sai. Não deixa criar lembrete no passado: dia anterior pisca vermelho com um aviso, e pontual no horário que já passou é barrado no salvar.
+
 ---
 
 ## Sumário
