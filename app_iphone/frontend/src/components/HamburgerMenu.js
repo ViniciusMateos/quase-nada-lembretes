@@ -173,6 +173,11 @@ export default function HamburgerMenu({ visible, onClose, navigation }) {
     setTimeout(() => navigation.navigate('NotificationSettings'), 240);
   };
 
+  const goToCalendar = () => {
+    close();
+    setTimeout(() => navigation.navigate('Calendar'), 240);
+  };
+
   const drawerBg = isDark ? 'rgba(18,16,22,0.55)' : 'rgba(248,248,250,0.72)';
   const cardBg = isDark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.035)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)';
@@ -220,6 +225,11 @@ export default function HamburgerMenu({ visible, onClose, navigation }) {
 
           <PressableScale style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={goToNotifications}>
             <Text style={[styles.cardText, { color: theme.textPrimary }]}>{t('chat.menu.notifications')}</Text>
+            <ChevronIcon direction="right" color={theme.textSecondary} size={26} />
+          </PressableScale>
+
+          <PressableScale style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={goToCalendar}>
+            <Text style={[styles.cardText, { color: theme.textPrimary }]}>{t('calendar.menu')}</Text>
             <ChevronIcon direction="right" color={theme.textSecondary} size={26} />
           </PressableScale>
 

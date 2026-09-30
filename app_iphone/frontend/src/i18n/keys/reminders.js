@@ -22,6 +22,7 @@ export default {
     'reminders.errorTitle': 'Erro',
     'reminders.deleteFailed': 'Não foi possível deletar o lembrete.',
     'reminders.updateFailed': 'Não foi possível atualizar o lembrete.',
+    'reminders.createFailed': 'Não foi possível criar o lembrete.',
     'reminders.taskFailed': 'Não foi possível criar a tarefa.',
     'reminders.taskDoneTitle': 'Pronto',
     'reminders.taskDoneMessage': 'Tarefa criada a partir do lembrete!',
@@ -54,6 +55,7 @@ export default {
     'reminders.error.pickDay': 'Selecione ao menos um dia',
     'reminders.error.pickDate': 'Selecione uma data',
     'reminders.error.interval': 'Informe um intervalo válido',
+    'reminders.error.pastTime': 'Não dá pra voltar no tempo.',
 
     // Unidades do intervalo
     'reminders.unit.minutes': 'minutos',
@@ -136,6 +138,7 @@ export default {
     'reminders.errorTitle': 'Error',
     'reminders.deleteFailed': 'Could not delete the reminder.',
     'reminders.updateFailed': 'Could not update the reminder.',
+    'reminders.createFailed': 'Could not create the reminder.',
     'reminders.taskFailed': 'Could not create the task.',
     'reminders.taskDoneTitle': 'Done',
     'reminders.taskDoneMessage': 'Task created from the reminder!',
@@ -168,6 +171,7 @@ export default {
     'reminders.error.pickDay': 'Pick at least one day',
     'reminders.error.pickDate': 'Pick a date',
     'reminders.error.interval': 'Enter a valid interval',
+    'reminders.error.pastTime': "Can't go back in time.",
 
     // Unidades do intervalo
     'reminders.unit.minutes': 'minutes',

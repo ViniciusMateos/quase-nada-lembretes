@@ -7,6 +7,7 @@ import reminders from './keys/reminders';
 import tasks from './keys/tasks';
 import chat from './keys/chat';
 import notifications from './keys/notifications';
+import calendar from './keys/calendar';
 
 // Idioma da INTERFACE. Não confundir com formato de hora: 12h/24h continua
 // vindo do aparelho (detectIs12h), porque o usuário pode querer o app em inglês
@@ -15,7 +16,7 @@ import notifications from './keys/notifications';
 // Conteúdo do usuário (título de lembrete, tarefa) e as respostas da IA no chat
 // NÃO são traduzidos: seguem como a pessoa escreveu / como o Gemini responde.
 
-const PACKS = [common, auth, reminders, tasks, chat, notifications];
+const PACKS = [common, auth, reminders, tasks, chat, notifications, calendar];
 
 const DICTS = {
   pt: Object.assign({}, ...PACKS.map(p => p.pt)),

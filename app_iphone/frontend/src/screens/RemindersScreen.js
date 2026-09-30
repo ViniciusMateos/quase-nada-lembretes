@@ -46,6 +46,7 @@ import HamburgerMenu, { HamburgerIcon } from '../components/HamburgerMenu';
 import TaskModal from '../components/TaskModal';
 import { createTask } from '../api/tasks.api';
 import PressableScale from '../components/PressableScale';
+import CalendarIcon from '../components/CalendarIcon';
 import { anim, getLocale, t, useI18n } from '../i18n';
 
 const IS_12H = detectIs12h();
@@ -988,10 +989,20 @@ export default function RemindersScreen({ navigation }) {
           </PressableScale>
         </View>
         <View style={styles.dateBlock}>
-          <Text style={styles.todayDate}>{formatTodayLabel()}</Text>
-          {reminders.length > 0 && (
-            <Text style={styles.editHint}>{t('reminders.editHint')}</Text>
-          )}
+          <View style={styles.dateTextCol}>
+            <Text style={styles.todayDate}>{formatTodayLabel()}</Text>
+            {reminders.length > 0 && (
+              <Text style={styles.editHint}>{t('reminders.editHint')}</Text>
+            )}
+          </View>
+          <PressableScale
+            onPress={() => navigation.navigate('Calendar')}
+            hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+            accessibilityLabel={t('calendar.title')}
+            accessibilityRole="button"
+          >
+            <CalendarIcon color={theme.textSecondary} size={26} />
+          </PressableScale>
         </View>
         <View style={styles.listWrap}>
           {isRefreshing && (
@@ -1107,22 +1118,29 @@ function makeStyles(theme) {
       fontFamily: 'System',
     },
     dateBlock: {
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
       paddingTop: 10,
+    },
+    dateTextCol: {
+      flex: 1,
+      paddingRight: 12,
     },
     todayDate: {
       fontSize: 14,
       fontWeight: '600',
       color: theme.textSecondary,
       fontFamily: 'System',
-      textAlign: 'center',
+      textAlign: 'left',
     },
     editHint: {
       fontSize: 12,
       color: theme.textSecondary,
       fontFamily: 'System',
-      textAlign: 'center',
-      paddingVertical: 8,
+      textAlign: 'left',
+      paddingTop: 6,
       fontStyle: 'italic',
     },
     listContent: { paddingBottom: 24 },

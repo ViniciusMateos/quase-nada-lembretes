@@ -14,6 +14,19 @@ import TasksScreen from '../screens/TasksScreen';
 import AccountScreen from '../screens/AccountScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import CalendarScreen from '../screens/CalendarScreen';
+import ErrorBoundary from '../components/ErrorBoundary';
+
+// Calendário embrulhado no ErrorBoundary: se algo estourar no render dele, mostra
+// o erro na tela em vez de fechar o app (o calendário já deu crash difícil de
+// reproduzir; assim capturamos a mensagem real e o app não morre).
+function CalendarScreenSafe(props) {
+  return (
+    <ErrorBoundary>
+      <CalendarScreen {...props} />
+    </ErrorBoundary>
+  );
+}
 import LoadingDog from '../components/LoadingDog';
 import LiquidTabBar from '../components/LiquidTabBar';
 
@@ -115,6 +128,7 @@ function AppStack() {
       <Stack.Screen name="Account" component={AccountScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="Calendar" component={CalendarScreenSafe} />
     </Stack.Navigator>
   );
 }

@@ -1,8 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
 import PressableScale from './PressableScale';
 import TimePickerNative from './TimePickerNative';
 import { t, useI18n } from '../i18n';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+// Chip de pré-lembrete entra/sai com transição curta (em vez de aparecer seco).
+function animarChips() {
+  LayoutAnimation.configureNext({
+    duration: 200,
+    create: { type: 'easeInEaseOut', property: 'scaleXY' },
+    update: { type: 'easeInEaseOut' },
+    delete: { type: 'easeInEaseOut', property: 'opacity' },
+  });
+}
 
 // Pré-lembretes: { type:'offset', seconds } ("X antes") ou
 // { type:'day', days, hour, minute } ("N dias antes, às HH:MM").
@@ -85,8 +98,8 @@ export default function PreReminderPicker({
     if (defaultTime) setDayTime(defaultTime);
   }, [defaultTime]);
 
-  const add = pr => onChange([...value, pr]);
-  const removeAt = i => onChange(value.filter((_, idx) => idx !== i));
+  const add = pr => { animarChips(); onChange([...value, pr]); };
+  const removeAt = i => { animarChips(); onChange(value.filter((_, idx) => idx !== i)); };
   const togglePreset = s => {
     const idx = value.findIndex(v => sameOffset(v, s));
     if (idx >= 0) removeAt(idx);
