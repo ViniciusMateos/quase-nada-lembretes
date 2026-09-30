@@ -11,6 +11,19 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.9.0] - 2026-09-30
+
+### Adicionado
+- **Calendário** (no menu e num atalho no cabeçalho da aba de Lembretes): feed de meses por scroll, com bolinha por dia — azul quando tem lembrete pontual, cinza quando só tem recorrente (a recorrência é expandida no cliente pra preencher todos os meses). Tocar num dia abre o painel do dia com os lembretes separados em pontuais e recorrentes, onde dá pra **criar** (data já preenchida), **editar** (toque) e **excluir** (segurar), tudo com animações de entra/sai. **Não deixa criar no passado**: dia anterior pisca vermelho com aviso, e pontual em horário que já passou é barrado no salvar. O modal de lembrete virou componente compartilhado (`EditReminderModal`) e a tela tem um `ErrorBoundary` de segurança.
+
+### Corrigido
+- **Conexão após OTA**: `process.env.API_BASE_URL` vinha `undefined` num bundle de OTA rodado sem a env e o app parava de conectar com tudo (mas ainda baixava OTA). Fallback hardcoded garante a URL no bundle independente da env.
+
+### Documentação
+- README com a seção do calendário.
+
+---
+
 ## [1.8.0] - 2026-09-10
 
 ### Adicionado
