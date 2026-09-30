@@ -2,7 +2,12 @@ import axios from 'axios';
 import { storage } from '../lib/storage';
 
 export const navigationRef = { current: null };
-const API_BASE_URL = process.env.API_BASE_URL;
+// Fallback hardcoded: `process.env.API_BASE_URL` é inlined no bundle em BUILD time
+// pela env do eas.json. Só que num `eas update` (OTA) rodado de um shell SEM essa
+// env, o bundle sai com a URL `undefined` → o app não conecta com NADA (mas ainda
+// baixa OTA, porque isso usa a updates.url do app.config). O `||` garante a URL
+// sempre presente no bundle, independente da env. Mesmo valor do eas.json.
+const API_BASE_URL = process.env.API_BASE_URL || 'http://147.15.7.119:8000';
 
 let logoutCallback = null;
 export function registerLogout(fn) {
