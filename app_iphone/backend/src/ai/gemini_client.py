@@ -19,17 +19,14 @@ logger = logging.getLogger(__name__)
 genai.configure(api_key=settings.google_api_key)
 
 MODELOS_PREFERIDOS = [
-    "models/gemini-2.5-flash-lite",
-    "models/gemini-3.1-flash-lite",   # 500 RPD — grande reserva
-    "models/gemini-2.5-flash",
-    "models/gemini-3-flash",
-    "models/gemini-2.0-flash",
-    "models/gemini-2.0-flash-lite",
-    "models/gemini-1.5-flash-8b",
-    "models/gemini-1.5-flash",
-    "models/gemini-2.5-pro",
-    "models/gemma-3-27b-it",          # 14.4K RPD — reserva enorme
-    "models/gemma-3-12b-it",
+    # Reordenado 20/10/2026: os que responderam durante o congestionamento do
+    # Google free-tier primeiro (503 high demand / 504 deadline sao transitorios).
+    "models/gemini-3.1-flash-lite",
+    "models/gemini-3.5-flash",
+    "models/gemini-flash-lite-latest",
+    "models/gemini-3.5-flash-lite",
+    "models/gemini-flash-latest",
+    "models/gemini-3.6-flash",
 ]
 
 # Quota cache: model_name -> timestamp until which it stays blocked (1h cooldown)
@@ -248,6 +245,46 @@ def _available_models() -> list[str]:
     return [m for m in MODELOS_PREFERIDOS if not _is_quota_blocked(m)]
 
 
+async def _classify_one(model_name: str, prompt: str) -> dict:
+    """Uma tentativa de classificacao num modelo (usada no race paralelo)."""
+    model = genai.GenerativeModel(model_name)
+    response = await asyncio.wait_for(
+        model.generate_content_async(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=512,
+            ),
+            request_options={"timeout": 25, "retry": None},
+        ),
+        timeout=28,
+    )
+    result = _extract_json(response.text)
+    result["_model_used"] = model_name
+    return result
+
+
+async def _chat_one(model_name: str, user_message: str, gemini_history: list) -> tuple:
+    """Uma tentativa de chat num modelo (usada no race paralelo)."""
+    model = genai.GenerativeModel(
+        model_name,
+        system_instruction=CHAT_SYSTEM_PROMPT,
+    )
+    chat = model.start_chat(history=gemini_history)
+    response = await asyncio.wait_for(
+        chat.send_message_async(
+            user_message,
+            generation_config=genai.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=512,
+            ),
+            request_options={"timeout": 25, "retry": None},
+        ),
+        timeout=28,
+    )
+    return response.text, model_name
+
+
 async def classify_intent(
     user_message: str,
     current_datetime: str,
@@ -266,47 +303,37 @@ async def classify_intent(
 
     last_error: Exception | None = None
 
-    for model_name in _available_models():
+    # Race PARALELO: dispara os top modelos ao mesmo tempo e pega o PRIMEIRO que
+    # responder com JSON valido. No congestionamento do free-tier, alguns modelos
+    # respondem em ~7-20s enquanto outros travam (504) — em serie isso somava 60s+
+    # e estourava; em paralelo o mais rapido ganha.
+    models = _available_models() or MODELOS_PREFERIDOS
+    last_error = None
+    for _round in range(2):  # 2 rodadas de race (app espera 90s); a 2a pega pico passageiro
+        tasks = {asyncio.create_task(_classify_one(m, prompt)): m for m in models}
+        pending = set(tasks)
         try:
-            model = genai.GenerativeModel(model_name)
-            response = await asyncio.wait_for(
-                model.generate_content_async(
-                    prompt,
-                    generation_config=genai.GenerationConfig(
-                        temperature=0.1,
-                        max_output_tokens=512,
-                    ),
-                    request_options={"timeout": 8, "retry": None},
-                ),
-                timeout=10,
-            )
-            result = _extract_json(response.text)
-            result["_model_used"] = model_name
-            logger.info("Intent classified using model: %s", model_name)
-            return result
-        except asyncio.TimeoutError:
-            logger.warning("Model %s timed out, skipping.", model_name)
-            last_error = Exception(f"Timeout on {model_name}")
-            continue
-        except json.JSONDecodeError as e:
-            logger.warning("Model %s returned invalid JSON: %s", model_name, e)
-            last_error = e
-            continue
-        except Exception as e:
-            err_str = str(e).lower()
-            if "429" in err_str or "quota" in err_str:
-                _mark_quota_exceeded(model_name)
-                last_error = e
-                continue
-            if "404" in err_str or "not found" in err_str:
-                logger.warning("Model %s not found, skipping.", model_name)
-                last_error = e
-                continue
-            logger.error("Unexpected error with model %s: %s", model_name, e)
-            last_error = e
-            continue
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for t in done:
+                    m = tasks[t]
+                    try:
+                        res = t.result()
+                        for pt in pending:
+                            pt.cancel()
+                        logger.info("Intent classified using model: %s (paralelo r%d)", m, _round + 1)
+                        return res
+                    except Exception as e:
+                        es = str(e).lower()
+                        if "429" in es or "quota" in es:
+                            _mark_quota_exceeded(m)
+                        last_error = e
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
 
-    raise RuntimeError(f"All Gemini models failed. Last error: {last_error}")
+    raise RuntimeError(f"All Gemini models failed (parallel). Last error: {last_error}")
 
 
 async def chat_general(
@@ -325,42 +352,31 @@ async def chat_general(
             role = "user" if entry["role"] == "user" else "model"
             gemini_history.append({"role": role, "parts": [entry["content"]]})
 
-    for model_name in _available_models():
+    # Race PARALELO (mesma ideia do classify): o primeiro modelo que responder ganha.
+    models = _available_models() or MODELOS_PREFERIDOS
+    last_error = None
+    for _round in range(2):
+        tasks = {asyncio.create_task(_chat_one(m, user_message, gemini_history)): m for m in models}
+        pending = set(tasks)
         try:
-            model = genai.GenerativeModel(
-                model_name,
-                system_instruction=CHAT_SYSTEM_PROMPT,
-            )
-            chat = model.start_chat(history=gemini_history)
-            response = await asyncio.wait_for(
-                chat.send_message_async(
-                    user_message,
-                    generation_config=genai.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=512,
-                    ),
-                    request_options={"timeout": 8, "retry": None},
-                ),
-                timeout=10,
-            )
-            logger.info("Chat response generated using model: %s", model_name)
-            return response.text, model_name
-        except asyncio.TimeoutError:
-            logger.warning("Model %s timed out on chat, skipping.", model_name)
-            last_error = Exception(f"Timeout on {model_name}")
-            continue
-        except Exception as e:
-            err_str = str(e).lower()
-            if "429" in err_str or "quota" in err_str:
-                _mark_quota_exceeded(model_name)
-                last_error = e
-                continue
-            if "404" in err_str or "not found" in err_str:
-                logger.warning("Model %s not found, skipping.", model_name)
-                last_error = e
-                continue
-            logger.error("Unexpected error with model %s: %s", model_name, e)
-            last_error = e
-            continue
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for t in done:
+                    m = tasks[t]
+                    try:
+                        text, used = t.result()
+                        for pt in pending:
+                            pt.cancel()
+                        logger.info("Chat response generated using model: %s (paralelo r%d)", m, _round + 1)
+                        return text, used
+                    except Exception as e:
+                        es = str(e).lower()
+                        if "429" in es or "quota" in es:
+                            _mark_quota_exceeded(m)
+                        last_error = e
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
 
-    raise RuntimeError(f"All Gemini models failed. Last error: {last_error}")
+    raise RuntimeError(f"All Gemini models failed (parallel). Last error: {last_error}")
