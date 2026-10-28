@@ -2,12 +2,13 @@
 
 Assistente pessoal de lembretes com inteligência artificial. Você escreve em linguagem natural — "me lembra de ligar pro médico amanhã às 10h" — e o app interpreta, agenda e dispara a notificação no horário certo.
 
-O projeto existe em duas versões:
+O projeto existe em três versões, todas falando com o mesmo backend:
 
 | Versão | Descrição | Stack |
 |--------|-----------|-------|
 | **Telegram Bot** | Cliente do backend do app — mesma IA, recorrência e banco | python-telegram-bot + httpx |
 | **App iOS** | Versão atual em desenvolvimento | React Native + FastAPI + Gemini AI + SQLite |
+| **Painel Web** | As telas do app num dashboard pro PC, sempre ligado local | Vite + React + TypeScript + Tailwind |
 
 Além dos lembretes por IA, o app iOS tem uma aba de **Tarefas** semanais — com prioridades, anotações, conclusão e reordenação por arraste (dentro da mesma prioridade) — e integração cruzada: segure uma tarefa para criar um lembrete, ou um lembrete para criar uma tarefa.
 
@@ -28,6 +29,7 @@ Tem também um **calendário** (no menu e num atalho no cabeçalho da aba de Lem
 - [App iOS — Quickstart](#app-ios--quickstart)
   - [Backend (FastAPI)](#backend-fastapi)
   - [Frontend (React Native)](#frontend-react-native)
+- [Painel Web (PC)](#painel-web-pc)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Referência da API](#referência-da-api)
 - [Arquitetura](#arquitetura)
@@ -194,6 +196,27 @@ npx expo export --platform web --output-dir dist-web-qa
 ```
 
 `dist-web-qa/` e apenas artefato temporario de QA e pode ser removido apos a validacao.
+
+## Painel Web (PC)
+
+`painel-web/` é a versão web do app pra usar no PC: chat com a IA, lembretes,
+calendário, tarefas e ajustes num dashboard com menu lateral retrátil, navegação
+animada e layout responsivo. Usa a mesma conta e os mesmos dados do app.
+
+Fica **sempre ligado** em http://quase-nada-lembretes.localhost:5178 — um
+servidor Node sem dependências (`serve.mjs`) serve o build e faz o proxy de
+`/api` pro backend, e o `supervisor.vbs` (chamado pela pasta Inicializar do
+Windows) sobe ele no login e re-sobe se cair. O `criar-atalho.ps1` cria o
+atalho com ícone que abre o painel como janela de app do Chrome.
+
+```bash
+cd painel-web
+npm install
+npm run build      # o servidor sempre ligado pega o build novo sozinho
+npm run dev        # modo dev (mesma porta: pare o supervisor antes)
+```
+
+Detalhes em [painel-web/README.md](painel-web/README.md).
 
 ### Regras de release (Expo/Metro)
 
@@ -760,4 +783,13 @@ quase_nada_lembretes/
             ├── screens/       # Chat, Tarefas, Lembretes, Login, Register, NotificationSettings
             ├── services/      # Notificações, fila de mensagens e tarefas em background
             └── utils/         # Formatação de hora (12h/24h)
+
+painel-web/                    # Painel web pro PC (Vite + React + TS + Tailwind)
+├── serve.mjs                  # Servidor sempre ligado: dist/ + proxy /api pro backend
+├── supervisor.vbs             # Sobe o serve.mjs no login e re-sobe se cair
+├── criar-atalho.ps1           # Atalho com ícone (janela de app do Chrome)
+└── src/
+    ├── lib/                   # api (axios + refresh), auth, utils (recorrência, datas)
+    ├── components/            # Layout (sidebar retrátil), ui, Modal, Toast, ReminderFormModal
+    └── pages/                 # Login, Chat, Reminders, Calendar, Tasks, Settings
 ```
