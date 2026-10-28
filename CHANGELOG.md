@@ -11,6 +11,21 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.10.0] - 2026-10-28
+
+### Adicionado
+- **Painel web** (`painel-web/`): as telas do app num dashboard pro PC (chat com a IA, lembretes, calendário, tarefas e ajustes), com menu lateral retrátil, navegação animada e layout responsivo. Mesma conta e mesmos dados do app (Vite + React + TypeScript + Tailwind + framer-motion).
+- **Painel sempre ligado** em `http://quase-nada-lembretes.localhost:5178`: `serve.mjs` (Node sem dependências) serve o build e faz o proxy de `/api` pro backend; `supervisor.vbs`, chamado pela pasta Inicializar do Windows, sobe no login e re-sobe se cair. Build novo é pego sem reiniciar.
+- **Ícone de app no Windows**: `criar-atalho.ps1` cria o atalho com o ícone do app que abre o painel como janela de app do Chrome, com o mesmo AppUserModelID da janela (atalho, ícone fixado e janela viram um botão só na barra).
+
+### Corrigido
+- **Chat 503 no pico do Gemini free-tier**: o backend agora dispara os modelos em paralelo e fica com o primeiro que responder (2 rodadas), com aliases `-latest` no lugar de modelos descontinuados.
+
+### Documentação
+- README com o painel web (sempre ligado, atalho e estrutura de pastas).
+
+---
+
 ## [1.9.0] - 2026-09-30
 
 ### Adicionado
