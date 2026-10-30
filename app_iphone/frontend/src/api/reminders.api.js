@@ -68,3 +68,18 @@ export async function syncReminders() {
   const response = await apiClient.get('/api/v1/reminders/sync');
   return response.data;
 }
+
+/**
+ * Conta ao backend o que ficou agendado na fila local do iPhone. O que NÃO
+ * estiver aqui (ex.: lembrete criado no painel web antes do app sincronizar) o
+ * backend manda por push na hora do disparo.
+ * @param {{
+ *   items: Array<{ reminder_id: string, kind: 'main'|'pre', ts: number }>,
+ *   lang: string,
+ *   priority: boolean,
+ *   append?: boolean
+ * }} payload
+ */
+export async function reportScheduled(payload) {
+  await apiClient.post('/api/v1/reminders/scheduled', payload);
+}

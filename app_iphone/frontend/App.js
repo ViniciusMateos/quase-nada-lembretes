@@ -110,8 +110,7 @@ export default function App() {
 
   // Toque em PUSH REMOTO (backend, via expo-notifications) — separado do notifee
   // (local). reminderId → abre a edição daquele lembrete; senão → abre o Chat.
-  // Cobre também o app matado (getLastNotificationResponseAsync). Só há push a
-  // partir do build com a entitlement; no build atual isto fica inerte.
+  // Cobre também o app matado (getLastNotificationResponseAsync).
   useEffect(() => {
     const rotearPush = resp => {
       const data = resp?.notification?.request?.content?.data || {};
@@ -136,7 +135,32 @@ export default function App() {
       .then(r => { if (r) rotearPush(r); })
       .catch(() => {});
     const sub = ExpoNotifications.addNotificationResponseReceivedListener(rotearPush);
-    return () => sub.remove();
+
+    // Push com o app ABERTO. Sem handler o expo-notifications engole o push —
+    // bom pro "lembrete criado" (o app já mostra o feedback dele). Mas o push de
+    // DISPARO (lembrete que o iPhone não tinha agendado, ver push/disparos.py no
+    // backend) tem que aparecer e tocar mesmo com o app aberto. Notificação
+    // local não passa por aqui: o notifee só repassa o que não é dele.
+    ExpoNotifications.setNotificationHandler({
+      handleNotification: async n => {
+        const disparo = n?.request?.content?.data?.tipo === 'disparo';
+        return {
+          shouldShowBanner: disparo,
+          shouldShowList: disparo,
+          shouldPlaySound: disparo,
+          shouldSetBadge: false,
+        };
+      },
+    });
+    // Push chegando com o app aberto = mudou algo no servidor (ex.: lembrete
+    // criado no painel web) → ressincroniza já, pra ele entrar na fila local.
+    const subRecebido = ExpoNotifications.addNotificationReceivedListener(() => {
+      syncReminders().then(scheduleFromSync).catch(() => {});
+    });
+    return () => {
+      sub.remove();
+      subRecebido.remove();
+    };
   }, []);
 
   // Deep links dos widgets. Cada widget abre numa tela diferente:

@@ -1,9 +1,9 @@
 import notifee, { TriggerType, AndroidImportance, EventType } from '@notifee/react-native';
 import { ExtensionStorage } from '@bacons/apple-targets';
 import { getPriorityEnabled } from './notificationSettings';
-import { createReminder } from '../api/reminders.api';
+import { createReminder, reportScheduled } from '../api/reminders.api';
 // Não é componente React: usa o `t` do módulo, que lê o idioma atual na hora da chamada.
-import { tRaw as t, getLocale } from '../i18n';
+import { tRaw as t, getLocale, getLang } from '../i18n';
 
 const CHANNEL_ID = 'quase-nada-lembretes';
 
@@ -315,12 +315,24 @@ async function gravarLembretesParaWidget(syncData, now) {
 // sem avisar, tudo que passar disso. Deixamos folga pros "adiar" one-off.
 const LIMITE_PENDENTES = 58;
 
+// Conta ao backend o que ficou na fila do iPhone: o que não estiver nela vira
+// push na hora do disparo (lembrete criado no painel web antes do app
+// sincronizar, ou que ficou de fora do limite do iOS). `append` = só soma (adiar
+// pontual); senão substitui o retrato inteiro. Best-effort: se falhar, o
+// backend continua com o retrato anterior até o próximo sync.
+function informarAgendados(items, append = false) {
+  reportScheduled({ items, lang: getLang(), priority: getPriorityEnabled(), append }).catch(() => {});
+}
+
 export async function scheduleFromSync(syncData) {
   try {
     await ensureChannel();
     await cancelSyncedNotifications();
 
-    if (!syncData?.reminders?.length) return;
+    if (!syncData?.reminders?.length) {
+      if (syncData) informarAgendados([]); // fila vazia: tudo que vier é por push
+      return;
+    }
 
     const now = Date.now();
 
@@ -337,7 +349,7 @@ export async function scheduleFromSync(syncData) {
 
       for (const pre of reminder.pre_executions || []) {
         const c = buildPreNotif(reminder, pre, now);
-        if (c) candidatos.push(c);
+        if (c) candidatos.push({ ...c, rid: reminder.id, kind: 'pre' });
       }
 
       const isRecurring = !!reminder.recurrence && reminder.recurrence !== 'once';
@@ -354,7 +366,7 @@ export async function scheduleFromSync(syncData) {
           title: reminder.title,
           isRecurring: isRecurring ? '1' : '0',
         };
-        candidatos.push({ ts, notif });
+        candidatos.push({ ts, notif, rid: reminder.id, kind: 'main' });
       }
     }
 
@@ -374,6 +386,10 @@ export async function scheduleFromSync(syncData) {
         `[Notifications] ${candidatos.length} candidatas; agendadas as ${LIMITE_PENDENTES} mais próximas (limite do iOS). As demais entram no próximo sync.`,
       );
     }
+    // Resumos não entram (não têm rid): o backend não manda push de resumo.
+    informarAgendados(
+      agendar.filter(c => c.kind).map(c => ({ reminder_id: c.rid, kind: c.kind, ts: c.ts })),
+    );
 
     await gravarLembretesParaWidget(syncData, now);
   } catch (error) {
@@ -516,6 +532,8 @@ async function scheduleServerReminderNotification(reminderId, title, timestamp) 
     type: TriggerType.TIMESTAMP,
     timestamp,
   });
+  // O lembrete do adiar existe no servidor: sem isto ele mandaria push também.
+  informarAgendados([{ reminder_id: reminderId, kind: 'main', ts: timestamp }], true);
 }
 
 // Trata o toque nas ações de adiar (foreground e background).
