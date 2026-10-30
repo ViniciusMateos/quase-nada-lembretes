@@ -141,12 +141,23 @@ export const tasksApi = {
   remove: (id: string) => api.delete(`/api/v1/tasks/${id}`).then((r) => r.data),
 }
 
+// Hora LOCAL com o fuso (ex.: 2026-10-29T11:07:16.978-03:00), igual ao app.
+// A IA lê isso como "agora" do usuário: mandar em UTC (toISOString) fazia ela
+// achar que eram 3h a mais e jogar "13h" pro dia seguinte.
+function localIsoComFuso(now = new Date()): string {
+  const offsetMin = -now.getTimezoneOffset()
+  const sign = offsetMin >= 0 ? '+' : '-'
+  const h = String(Math.floor(Math.abs(offsetMin) / 60)).padStart(2, '0')
+  const m = String(Math.abs(offsetMin) % 60).padStart(2, '0')
+  return new Date(now.getTime() + offsetMin * 60000).toISOString().replace('Z', `${sign}${h}:${m}`)
+}
+
 export const chatApi = {
   send: (content: string, sessionId: string) =>
     api
       .post<MessageResponse>('/api/v1/messages', {
         content,
-        client_timestamp: new Date().toISOString(),
+        client_timestamp: localIsoComFuso(),
         hour_format: '24h',
         session_id: sessionId,
         client_message_id: crypto.randomUUID(),
