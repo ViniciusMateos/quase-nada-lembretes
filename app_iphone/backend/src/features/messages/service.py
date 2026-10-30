@@ -6,7 +6,7 @@ Classifies intent via Gemini → executes action → saves history → returns r
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -20,7 +20,7 @@ from src.features.reminders.repository import (
     get_active_reminders_for_user,
     search_reminders_by_title,
 )
-from src.features.reminders.service import create_reminder_from_data, find_reminders_for_deletion, update_reminder
+from src.features.reminders.service import BRT, create_reminder_from_data, find_reminders_for_deletion, update_reminder
 from src.features.reminders.schemas import ReminderUpdate
 from src.features.reminders.schemas import ReminderOut
 from src.features.push.sender import fetch_expo_tokens, fire_push
@@ -103,12 +103,30 @@ async def _get_recent_history(
     return [{"role": r.role, "content": r.content} for r in rows]
 
 
+def _hora_cliente_brt(ts: str) -> str:
+    """
+    A hora do cliente é o "agora" que a IA usa pra calcular "13h", "amanhã",
+    "daqui 15 segundos" — e o sistema todo é no fuso de Brasília. Cliente que
+    manda em UTC (o painel web antigo usava toISOString) fazia a IA achar que
+    eram 3h a mais: "13h" ia pro dia seguinte e "daqui 15 segundos" pra 3h
+    depois. Hora em UTC vira Brasília; com outro fuso (o app manda -03:00), fica.
+    """
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return ts
+    if dt.utcoffset() == timedelta(0):
+        return dt.astimezone(BRT).isoformat()
+    return ts
+
+
 async def process_message(
     db: AsyncSession,
     user: User,
     payload: MessageRequest,
 ) -> MessageResponse:
     message_id = str(uuid.uuid4())
+    payload.client_timestamp = _hora_cliente_brt(payload.client_timestamp)
 
     # ── Idempotência ──────────────────────────────────────────────────────────
     # Se o cliente mandou um client_message_id e já processamos essa mensagem
