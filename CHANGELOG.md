@@ -11,6 +11,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.10.1] - 2026-10-29
+
+### Corrigido
+- **Chat do painel jogava o lembrete pro dia seguinte**: o painel mandava a hora em UTC, a IA achava que eram 3h a mais e marcava pro outro dia um horário de hoje que ainda não tinha passado (ex.: "13h" pedido às 11h), e a confirmação saía em UTC. Agora manda a hora local com fuso, igual ao app.
+
+---
+
 ## [1.10.0] - 2026-10-28
 
 ### Adicionado
