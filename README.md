@@ -14,7 +14,7 @@ Além dos lembretes por IA, o app iOS tem uma aba de **Tarefas** semanais — co
 
 O app é **bilíngue (português / inglês)** — o idioma da interface é escolhido no menu, sem tocar no conteúdo do usuário nem no chat (a IA responde em português); o formato de hora (12h/24h) segue o aparelho, não o idioma. Traz também **widgets nativos** (atalho de criar lembrete, próximo lembrete na tela de bloqueio e a lista de próximos, em azul ou neutro) que leem os dados via App Group, e **notificações ricas** via extensão nativa (o resumo diário/semanal e o lembrete expandido com pré-avisos "me avise antes").
 
-Qualquer resposta do chat também **notifica quando você não está vendo a conversa**: fora do app vira notificação real do iOS; com o app aberto em outra tela, um **banner simulado** estilo iOS (desliza de cima, fecha no swipe, vai pro Chat ao tocar). Mandar um lembrete e sair do app na hora ainda envia e avisa, sem falso erro de offline. A recorrência por intervalo aceita **minutos** (além de horas e dias), e a abertura por widget/notificação segura o splash até a tela-objetivo carregar, sem piscar.
+Qualquer resposta do chat também **notifica quando você não está vendo a conversa**: fora do app vira notificação real do iOS; com o app aberto em outra tela, um **banner simulado** estilo iOS (desliza de cima, fecha no swipe, vai pro Chat ao tocar). Mandar um lembrete e sair do app na hora ainda envia e avisa, sem falso erro de offline. Lembrete criado fora do app (pelo painel web, por exemplo) toca no iPhone mesmo antes de o app sincronizar: o backend manda push na hora do disparo pro que o iPhone não tem agendado. A recorrência por intervalo aceita **minutos** (além de horas e dias), e a abertura por widget/notificação segura o splash até a tela-objetivo carregar, sem piscar.
 
 Quando a sessão cai, dá pra **entrar por Face ID** em vez de digitar a senha: a senha fica guardada no Keychain (liberada pela biometria) e o Face ID dispara ao tocar na conta salva — com o campo de senha sempre de fallback. Configurável em Ajustes → Conta.
 
@@ -225,7 +225,7 @@ Detalhes em [painel-web/README.md](painel-web/README.md).
 - Quando entrar dependência nativa (ex.: `react-native-pager-view`), código Swift dos targets (widget/extensão) ou mudança de entitlement, é obrigatório gerar novo build iOS com `eas build`.
 - O `runtimeVersion` é **fixo** (`'1.0.0'` no `app.config.js`), desamarrado da `version`: dá pra bumpar a versão de marketing sem invalidar o OTA. **Só suba o `runtimeVersion` quando o código nativo mudar** — senão um app antigo baixaria um JS que espera um módulo que ele não tem.
 - Widgets e extensão de notificação vivem em `app_iphone/frontend/targets/` (via `@bacons/apple-targets`). A categoria da extensão fica no `targets/resumo-notif/Info.plist` escrito à mão — o plugin ignora o campo `infoPlist` do `expo-target.config.js`.
-- **Push remoto** (backend notifica com o app fechado) exige a entitlement `aps-environment` (`app.config.js`) → só vale a partir do build. Sons custom de notificação (`sound-receive.wav`/`sound-reminder.wav`) também são empacotados no build via o plugin `expo-notifications`.
+- **Push remoto** (backend notifica com o app fechado) depende da entitlement `aps-environment` (`app.config.js`), que já está no build atual. Sons custom de notificação (`sound-receive.wav`/`sound-reminder.wav`) também são empacotados no build via o plugin `expo-notifications`.
 - **Login por Face ID** usa `expo-local-authentication` + `expo-secure-store` (senha no Keychain) + `NSFaceIDUsageDescription` no `app.config.js` → deps nativas, valem a partir do build. Os imports são guardados (`require` em try) pra não quebrar em build sem os módulos.
 - **Versão OTA:** incremente `OTA_VERSION` em `src/constants/otaVersion.js` a **cada** `eas update`. O número aparece no rodapé do menu ("OTA #N · atualizado/build") e confirma no device que o bundle novo baixou. Não confundir com `version` (marketing) nem com `runtimeVersion` (compatibilidade nativa).
 
@@ -505,6 +505,25 @@ Retorna os próximos horários de execução de cada lembrete ativo. Usado pelo 
 }
 ```
 
+#### `POST /reminders/scheduled` — Informar o que o iPhone agendou
+
+Chamado pelo app depois de cada sync (e ao adiar um lembrete pontual). É o retrato da fila de notificações locais do iPhone: o backend manda push na hora do disparo **só** do que não estiver aqui (ver [Push Notifications](#push-notifications)).
+
+**Request:**
+```json
+{
+  "items": [
+    { "reminder_id": "uuid", "kind": "main", "ts": 1793329317000 },
+    { "reminder_id": "uuid", "kind": "pre",  "ts": 1793328717000 }
+  ],
+  "lang": "pt",
+  "priority": true,
+  "append": false
+}
+```
+
+`kind` = `main` (disparo) ou `pre` (pré-aviso); `ts` = epoch em ms, o mesmo do id da notificação local; `priority` = "Notificação prioritária" ligada (push sai como time-sensitive); `append: true` soma ao retrato em vez de substituir. **Response 204.**
+
 ---
 
 ### Tarefas
@@ -553,7 +572,12 @@ Campos opcionais: `name`, `priority`, `notes`, `completed`, `week_key` (semana d
 
 ### Push Notifications
 
-> O backend **envia push** (Expo Push) quando cria um lembrete a partir de uma mensagem — assim a notificação de "lembrete criado" chega mesmo com o app fechado/matado. O app registra o token via `/push/register`. Em foreground o push é suprimido (o feedback in-app cobre). Exige a entitlement `aps-environment` no build.
+> O backend **envia push** (Expo Push) em dois casos. O app registra o token via `/push/register`.
+>
+> - **Lembrete criado pelo chat:** o "lembrete criado" chega mesmo com o app fechado/matado. Em foreground é suprimido (o feedback in-app cobre).
+> - **Na hora do disparo, pro que o iPhone não agendou:** o lembrete toca por notificação local, agendada a cada sync. O que o app ainda não sincronizou (criado no painel web, por ex.) não estava na fila e não tocava. Agora o app informa a fila (`POST /reminders/scheduled`) e o job do backend (a cada 5 s, `push/disparos.py`) manda push dos disparos e pré-avisos vencidos que não estão nela, com o som de lembrete e `data.tipo = "disparo"`. Esse push aparece mesmo com o app aberto. Sem retrato da fila o backend não manda nada, pra não tocar em dobro.
+>
+> Qualquer push recebido com o app aberto faz o app sincronizar na hora.
 
 #### `POST /push/register` — Registrar token de push
 
@@ -601,11 +625,11 @@ iPhone (React Native)
        │              │                 │
        │         Cria lembrete    Responde chat
        │              │
-       │         APScheduler
-       │         (dispara no horário)
-       │              │
-       └── @notifee ◄─┘
-         (notificação local no iPhone)
+       ├── GET /reminders/sync ──► agenda notificação local (@notifee)
+       │                           e informa a fila (POST /reminders/scheduled)
+       │
+       └── APScheduler (a cada 5 s): avança os lembretes vencidos e manda
+           push (Expo) do que venceu e não está na fila do iPhone
 ```
 
 **Banco de dados (backend):**
@@ -644,6 +668,13 @@ push_tokens               # tokens de push por usuário (backend envia via Expo 
   ├── token (unique)
   ├── platform (ios | android)
   ├── created_at
+  └── updated_at
+
+device_schedules          # retrato da fila local do iPhone (POST /reminders/scheduled)
+  ├── user_id (PK, FK → users)
+  ├── items               # JSON [[reminder_id, "main"|"pre", ts_ms], ...]
+  ├── lang
+  ├── priority
   └── updated_at
 
 tasks
@@ -735,7 +766,7 @@ python init_db.py
 uvicorn src.main:app --reload --port 8000
 ```
 
-O scheduler roda a cada 60 segundos. Cheque os logs da aplicação — deve aparecer a linha `APScheduler started` na inicialização.
+O scheduler roda a cada 5 segundos (o log de cada execução fica em WARNING pra não afogar o journal). Cheque os logs da aplicação — deve aparecer a linha `APScheduler started` na inicialização. Push de disparo aparece como `Push de disparo (main|pre)`, e push recusado pelo Expo como `Expo push recusado`.
 
 ---
 
@@ -765,7 +796,7 @@ quase_nada_lembretes/
     │       │   ├── messages/  # Chat com a IA
     │       │   ├── reminders/ # CRUD de lembretes (incl. recorrência por dias da semana)
     │       │   ├── tasks/     # CRUD de tarefas semanais (carry-over, prioridades, ordem)
-    │       │   └── push/      # Tokens de push + envio via Expo Push (sender.py)
+    │       │   └── push/      # Tokens de push, envio via Expo (sender.py) e push na hora do disparo (disparos.py)
     │       ├── middleware/    # Tratamento global de erros
     │       └── models/        # Modelos SQLAlchemy (User, Reminder, Task, ChatHistory, PushToken)
     │
