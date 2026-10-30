@@ -11,6 +11,19 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.11.0] - 2026-10-30
+
+### Adicionado
+- **Push na hora do lembrete pro que o iPhone não agendou**: lembrete criado fora do app (painel web) só tocava depois que o app sincronizava. Agora o app informa ao backend a fila de notificações locais a cada sync (`POST /reminders/scheduled`) e o backend, a cada 5 s, manda push dos disparos e pré-avisos vencidos que não estão nela. Com o app aberto o push aparece e toca, e qualquer push recebido faz o app sincronizar na hora (OTA 40).
+
+### Corrigido
+- **Hora do cliente em UTC**: o backend converte pra Brasília a hora que chega em UTC antes de mandar pra IA. Janela antiga do painel web jogava "13h" pro dia seguinte e "daqui 15 segundos" pra 3h depois.
+
+### Documentação
+- README com o push na hora do disparo, o endpoint `POST /reminders/scheduled` e a tabela `device_schedules`.
+
+---
+
 ## [1.10.1] - 2026-10-29
 
 ### Corrigido
