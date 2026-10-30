@@ -28,18 +28,27 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+# O job roda a cada poucos segundos: o "Running job..." do APScheduler em INFO
+# afogaria o journal. Erro do job continua aparecendo (WARNING+).
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 scheduler = AsyncIOScheduler(timezone=pytz.utc)
+
+# Tick do job de lembretes. Curto porque é ele que manda o push na hora do
+# disparo (push/disparos.py): o atraso do push é no máximo isto.
+TICK_SEGUNDOS = 5
 
 
 async def _process_due_reminders() -> None:
     """
     APScheduler job: advance reminders that have passed their next_execution time.
-    Runs every minute.
+    Runs every TICK_SEGUNDOS. Antes de avançar, manda push do que venceu e o
+    iPhone não tinha agendado.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
     from src.core.database import AsyncSessionLocal
     from src.models.models import Reminder
+    from src.features.push.disparos import avisar_disparos
     from src.features.reminders.service import calcular_proxima_execucao
     from sqlalchemy import select
 
@@ -55,6 +64,12 @@ async def _process_due_reminders() -> None:
                 )
             )
             due_reminders = list(result.scalars().all())
+
+            # Push é best-effort: erro aqui não pode travar o avanço abaixo.
+            try:
+                await avisar_disparos(db, due_reminders, now, timedelta(seconds=TICK_SEGUNDOS))
+            except Exception:
+                logger.exception("Erro ao mandar push de disparo.")
 
             for reminder in due_reminders:
                 current_dt = datetime.fromisoformat(reminder.next_execution)
@@ -127,6 +142,16 @@ async def _run_migrations() -> None:
             "CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id)"
         ))
 
+        # O que o iPhone deixou agendado na fila local (POST /reminders/scheduled).
+        # items = JSON [[reminder_id, "main"|"pre", ts_ms], ...]. O push de
+        # disparo só sai pro que não está aqui.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS device_schedules ("
+            "user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, "
+            "items TEXT NOT NULL, lang TEXT, priority INTEGER NOT NULL DEFAULT 0, "
+            "updated_at TEXT NOT NULL)"
+        ))
+
         # Tarefas (feature tasks) — cria a tabela e índices se ainda não existirem.
         await conn.execute(text(
             "CREATE TABLE IF NOT EXISTS tasks ("
@@ -161,7 +186,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         _process_due_reminders,
         trigger="interval",
-        seconds=60,
+        seconds=TICK_SEGUNDOS,
         id="process_due_reminders",
         replace_existing=True,
     )

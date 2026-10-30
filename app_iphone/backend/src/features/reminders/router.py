@@ -9,6 +9,7 @@ from src.features.reminders.schemas import (
     ReminderListResponse,
     ReminderOut,
     ReminderUpdate,
+    ScheduledReport,
     SyncResponse,
 )
 from src.features.reminders.service import (
@@ -18,6 +19,7 @@ from src.features.reminders.service import (
     sync_reminders,
     update_reminder,
 )
+from src.features.push.disparos import salvar_agendados
 from src.models.models import User
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
@@ -51,6 +53,17 @@ async def sync(
     db: AsyncSession = Depends(get_db),
 ) -> SyncResponse:
     return await sync_reminders(db, current_user.id, horizon_days, max_per_reminder)
+
+
+@router.post("/scheduled", status_code=status.HTTP_204_NO_CONTENT)
+async def report_scheduled(
+    payload: ScheduledReport,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """O app conta o que agendou no iPhone; o resto vira push na hora do disparo."""
+    items = [(it.reminder_id, it.kind, it.ts) for it in payload.items]
+    await salvar_agendados(db, current_user.id, items, payload.lang, payload.priority, payload.append)
 
 
 @router.patch("/{reminder_id}", response_model=ReminderOut, status_code=status.HTTP_200_OK)

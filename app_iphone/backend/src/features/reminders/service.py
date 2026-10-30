@@ -353,6 +353,17 @@ def calcular_execucoes_futuras(
     return [d.isoformat() for d in _execucoes_principais(reminder, horizon_days, max_per_reminder)]
 
 
+def instante_pre_aviso(m: datetime, spec: dict) -> datetime:
+    """Instante (UTC) do pré-aviso `spec` para o disparo `m`."""
+    if spec["type"] == "offset":
+        return m - timedelta(seconds=spec["seconds"])
+    # "day": às H:M, D dias antes do disparo, no fuso de Brasília
+    m_brt = m.astimezone(BRT) - timedelta(days=spec["days"])
+    return m_brt.replace(
+        hour=spec["hour"], minute=spec["minute"], second=0, microsecond=0
+    ).astimezone(timezone.utc)
+
+
 def calcular_pre_avisos(
     reminder: Reminder,
     horizon_days: int,
@@ -378,13 +389,7 @@ def calcular_pre_avisos(
     avisos: dict[datetime, dict] = {}
     for m in mains:
         for spec in pre_specs:
-            if spec["type"] == "offset":
-                pre = m - timedelta(seconds=spec["seconds"])
-            else:  # "day": às H:M, D dias antes do disparo, no fuso de Brasília
-                m_brt = m.astimezone(BRT) - timedelta(days=spec["days"])
-                pre = m_brt.replace(
-                    hour=spec["hour"], minute=spec["minute"], second=0, microsecond=0
-                ).astimezone(timezone.utc)
+            pre = instante_pre_aviso(m, spec)
             if not (now <= pre <= horizon_end):
                 continue
             # Dedup por instante: se dois specs caem no mesmo minuto, fica o que
@@ -398,6 +403,37 @@ def calcular_pre_avisos(
                 }
 
     return [avisos[k] for k in sorted(avisos)]
+
+
+def pre_avisos_no_intervalo(
+    reminder: Reminder, inicio: datetime, fim: datetime
+) -> list[tuple[datetime, datetime]]:
+    """
+    Pré-avisos com instante em (inicio, fim], como (instante, disparo).
+
+    Mesmo dedup do /sync: dois specs no mesmo instante viram um só, apontando pro
+    disparo mais próximo — senão o push sairia com outro id do que o app agendou.
+    """
+    specs = _pre_specs(getattr(reminder, "pre_reminders", None))
+    if not specs or not reminder.is_active:
+        return []
+
+    # Antecedência máxima → até onde olhar disparos à frente (fim da janela + ela).
+    lead_max = max(
+        s["seconds"] if s["type"] == "offset" else (s["days"] + 1) * 86400 for s in specs
+    )
+    ate = (fim - datetime.now(timezone.utc)).total_seconds() + lead_max
+    mains = _execucoes_principais(reminder, max(0, int(ate // 86400)) + 2, 1000)
+
+    achados: dict[datetime, datetime] = {}
+    for m in mains:
+        if m - timedelta(seconds=lead_max) > fim:
+            break  # disparos em ordem: daqui pra frente nenhum pré-aviso cai na janela
+        for spec in specs:
+            pre = instante_pre_aviso(m, spec)
+            if inicio < pre <= fim and (pre not in achados or m < achados[pre]):
+                achados[pre] = m
+    return sorted(achados.items())
 
 
 async def list_reminders(

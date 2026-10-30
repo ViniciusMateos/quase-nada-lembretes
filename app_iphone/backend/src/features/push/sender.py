@@ -38,9 +38,16 @@ async def fetch_expo_tokens(db: AsyncSession, user_id: str) -> list[str]:
     return [t for t in rows if t and t.startswith("ExponentPushToken")]
 
 
-async def _post_expo(tokens: list[str], title: str, body: str, data: dict | None) -> None:
+async def _post_expo(
+    tokens: list[str],
+    title: str,
+    body: str,
+    data: dict | None,
+    sound: str,
+    extra: dict | None,
+) -> None:
     messages = [
-        {"to": t, "title": title, "body": body, "sound": PUSH_SOUND, "data": data or {}}
+        {"to": t, "title": title, "body": body, "sound": sound, "data": data or {}, **(extra or {})}
         for t in tokens
     ]
     try:
@@ -50,14 +57,27 @@ async def _post_expo(tokens: list[str], title: str, body: str, data: dict | None
             )
             if resp.status_code >= 400:
                 logger.warning("Expo push HTTP %s: %s", resp.status_code, resp.text[:200])
+                return
+            # 200 não quer dizer entregue: o erro por token vem no ticket.
+            for ticket in resp.json().get("data") or []:
+                if ticket.get("status") == "error":
+                    logger.warning("Expo push recusado: %s", ticket.get("message", "")[:200])
     except Exception as e:  # noqa: BLE001 — best-effort
         logger.warning("Falha ao enviar push Expo: %s", e)
 
 
-def fire_push(tokens: list[str], title: str, body: str, data: dict | None = None) -> None:
-    """Dispara o push sem bloquear a resposta (fire-and-forget)."""
+def fire_push(
+    tokens: list[str],
+    title: str,
+    body: str,
+    data: dict | None = None,
+    sound: str = PUSH_SOUND,
+    extra: dict | None = None,
+) -> None:
+    """Dispara o push sem bloquear a resposta (fire-and-forget).
+    `extra` entra direto na mensagem do Expo (priority, interruptionLevel...)."""
     if not tokens:
         return
-    task = asyncio.create_task(_post_expo(tokens, title, body, data))
+    task = asyncio.create_task(_post_expo(tokens, title, body, data, sound, extra))
     _bg_tasks.add(task)
     task.add_done_callback(_bg_tasks.discard)

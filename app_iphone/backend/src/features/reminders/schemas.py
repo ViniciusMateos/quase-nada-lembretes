@@ -1,6 +1,7 @@
 import json
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 def _parse_days_csv(value) -> list[int] | None:
@@ -134,3 +135,19 @@ class ScheduledExecution(BaseModel):
 class SyncResponse(BaseModel):
     synced_at: str
     reminders: list[ScheduledExecution]
+
+
+class ScheduledItem(BaseModel):
+    reminder_id: str
+    kind: Literal["main", "pre"]  # disparo real ou pré-aviso
+    ts: int                       # epoch em ms, o mesmo do id da notificação local
+
+
+class ScheduledReport(BaseModel):
+    """O que o iPhone deixou agendado na fila de notificações locais. O backend
+    manda push na hora só do que NÃO está aqui (ver push/disparos.py)."""
+    items: list[ScheduledItem] = Field(default_factory=list, max_length=300)
+    lang: str = "pt"
+    priority: bool = False  # "Notificação prioritária" ligada no app
+    # True = soma aos que já estavam (adiar pontual); False = substitui (sync)
+    append: bool = False
