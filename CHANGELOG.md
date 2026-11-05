@@ -11,6 +11,16 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.12.0] - 2026-11-05
+
+### Adicionado
+- **Ícone do painel avisa se está iniciando ou fora do ar**: o atalho fixado abre pelo `painel-web/abrir.vbs`, que abre a janela na hora se o painel responde; senão avisa "ainda está iniciando" (PC ligado há menos de 8 min) ou "pode estar fora do ar" e abre sozinho quando o servidor subir. `criar-atalho.ps1` ganhou `-UrlCheck`.
+
+### Documentação
+- README do painel web: sobe por tarefa agendada no logon (sem o atraso da pasta Inicializar) e o ícone abre pelo `abrir.vbs`.
+
+---
+
 ## [1.11.0] - 2026-10-30
 
 ### Adicionado
