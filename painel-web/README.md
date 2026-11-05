@@ -24,8 +24,13 @@ O painel fica no ar sozinho em **http://quase-nada-lembretes.localhost:5178**:
   Log em `serve.log`.
 - `supervisor.vbs` — roda o `serve.mjs` escondido e re-sobe se cair. Se a porta
   já tem outra instância, sai sozinho (o `serve.mjs` devolve código 3).
-- `QuaseNada-Lembretes-Painel.vbs` na pasta **Inicializar** do Windows chama o
-  `supervisor.vbs` no login.
+- A tarefa agendada `QuaseNada-Lembretes-Painel` chama o `supervisor.vbs` no
+  login (sobe na hora, sem o atraso da pasta Inicializar). O padrão de
+  inicialização de todos os processos sempre-ligados mora em
+  `quase-nada-bots-device/inicializacao/registrar-tarefas.ps1`.
+- `abrir.vbs` — o que o ícone fixado chama: se o painel ainda não respondeu,
+  avisa "ainda está iniciando" (PC ligado há pouco) ou "pode estar fora do ar"
+  e abre a janela sozinho quando ele subir.
 
 Mexeu no código? `npm run build` e pronto: o servidor lê o `dist/` a cada
 request, não precisa reiniciar.

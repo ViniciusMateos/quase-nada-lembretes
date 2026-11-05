@@ -1,7 +1,8 @@
 ' Supervisor do painel web do Quase Nada Lembretes (sempre ligado).
 ' Roda o serve.mjs escondido e re-sobe se cair. Se o serve.mjs sair com 3,
 ' a porta ja tem outra instancia no ar -> este supervisor encerra.
-' Disparado no login pelo QuaseNada-Lembretes-Painel.vbs na pasta Inicializar.
+' Disparado no login pela tarefa agendada QuaseNada-Lembretes-Painel
+' (quase-nada-bots-device\inicializacao\registrar-tarefas.ps1).
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 sh.CurrentDirectory = fso.GetParentFolderName(WScript.ScriptFullName)
