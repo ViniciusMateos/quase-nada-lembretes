@@ -11,6 +11,17 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.13.0] - 2026-11-09
+
+### Adicionado
+- **Excluir de dentro do lembrete no painel web**: o modal que abre ao clicar num lembrete ganhou o botão Excluir, com confirmação no próprio rodapé. Clicar na linha do lembrete (Lembretes e Calendário) abre o modal, igual ao app.
+- **Lembretes do painel separados por data, igual ao app**: Hoje, Amanhã, dia da semana, Semana que vem, Daqui N semanas, Mês que vem e mês por nome, com contador por grupo; os recorrentes ficam embaixo do divisor "Recorrentes", com os mesmos grupos.
+
+### Documentação
+- READMEs com as novidades do painel; o da raiz ainda dizia que o painel subia pela pasta Inicializar (hoje é tarefa agendada no logon).
+
+---
+
 ## [1.12.0] - 2026-11-05
 
 ### Adicionado
