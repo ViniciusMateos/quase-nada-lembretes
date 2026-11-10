@@ -322,7 +322,8 @@ function DaySection({ title, items, onEdit, onDelete }: DaySectionProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="group flex items-center gap-3 rounded-xl bg-surface2/60 border border-border px-3 py-2.5"
+              onClick={() => onEdit(r)}
+              className="group flex items-center gap-3 rounded-xl bg-surface2/60 border border-border px-3 py-2.5 cursor-pointer hover:border-primary/40 transition-colors"
             >
               <div className="flex items-center gap-1.5 w-[58px] shrink-0 text-xs font-semibold text-txt-dim">
                 <Clock className="h-3.5 w-3.5 text-txt-faint" />
@@ -332,7 +333,10 @@ function DaySection({ title, items, onEdit, onDelete }: DaySectionProps) {
                 <p className="text-sm font-semibold text-txt truncate">{r.title}</p>
                 <p className="text-[11px] text-txt-faint truncate">{recurrenceLabel(r)}</p>
               </div>
-              <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+              <div
+                className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   onClick={() => onEdit(r)}
                   aria-label="Editar"

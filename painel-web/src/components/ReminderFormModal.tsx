@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import { errorMessage, remindersApi } from '../lib/api'
 import { cn } from '../lib/utils'
 import type { PreReminder, Recurrence, Reminder } from '../types'
@@ -44,7 +44,7 @@ export function ReminderFormModal({
   onClose: () => void
   reminder?: Reminder | null
   defaultDate?: string // YYYY-MM-DD (criar a partir de um dia do calendário)
-  onSaved?: () => void
+  onSaved?: () => void // salvou OU excluiu: quem abriu recarrega a lista
 }) {
   const toast = useToast()
   const isEdit = !!reminder?.id
@@ -57,10 +57,14 @@ export function ReminderFormModal({
   const [customPre, setCustomPre] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Excluir pede confirmação no próprio rodapé (sem abrir outro modal por cima).
+  const [confirmDel, setConfirmDel] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setError('')
+    setConfirmDel(false)
     if (reminder) {
       setTitle(reminder.title)
       setRecurrence(reminder.recurrence || 'once')
@@ -141,20 +145,53 @@ export function ReminderFormModal({
     }
   }
 
+  const remove = async () => {
+    if (!reminder) return
+    setDeleting(true)
+    try {
+      await remindersApi.remove(reminder.id)
+      toast.ok('Lembrete excluído')
+      onSaved?.()
+      onClose()
+    } catch (e) {
+      setError(errorMessage(e, 'Não foi possível excluir.'))
+      setConfirmDel(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={isEdit ? 'Editar lembrete' : 'Novo lembrete'}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={save} loading={saving}>
-            Salvar
-          </Button>
-        </>
+        confirmDel ? (
+          <>
+            <p className="mr-auto self-center text-sm text-txt-dim">Excluir de vez? Não dá pra desfazer.</p>
+            <Button variant="ghost" onClick={() => setConfirmDel(false)}>
+              Voltar
+            </Button>
+            <Button variant="danger" onClick={remove} loading={deleting}>
+              <Trash2 className="h-4 w-4" /> Excluir
+            </Button>
+          </>
+        ) : (
+          <>
+            {isEdit && (
+              <Button variant="danger" className="mr-auto" onClick={() => setConfirmDel(true)}>
+                <Trash2 className="h-4 w-4" /> Excluir
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button onClick={save} loading={saving}>
+              Salvar
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-5">

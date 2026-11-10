@@ -171,7 +171,11 @@ function ReminderRow({
   const preCount = reminder.pre_reminders?.length ?? 0
 
   return (
-    <Card className="flex items-center gap-3 p-4 hover:border-primary/40 transition-colors">
+    // Clicar no lembrete abre a edição (igual ao app); os botões não propagam.
+    <Card
+      onClick={() => onEdit(reminder)}
+      className="flex items-center gap-3 p-4 cursor-pointer hover:border-primary/40 transition-colors"
+    >
       {/* bolinha de status: pontual = primary, recorrente = faint */}
       <span className={cn('h-2 w-2 rounded-full shrink-0', pontual ? 'bg-primary' : 'bg-txt-faint')} />
 
@@ -190,7 +194,7 @@ function ReminderRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="icon" onClick={() => onEdit(reminder)} aria-label="Editar lembrete">
           <Pencil className="h-4 w-4" />
         </Button>

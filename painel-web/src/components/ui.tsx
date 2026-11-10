@@ -78,9 +78,17 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   },
 )
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({
+  className,
+  children,
+  onClick,
+}: {
+  className?: string
+  children: ReactNode
+  onClick?: () => void
+}) {
   return (
-    <div className={cn('bg-surface border border-border rounded-xl2 shadow-card', className)}>
+    <div onClick={onClick} className={cn('bg-surface border border-border rounded-xl2 shadow-card', className)}>
       {children}
     </div>
   )
