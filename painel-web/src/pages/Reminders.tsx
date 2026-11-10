@@ -3,20 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Pencil, Plus, Trash2 } from 'lucide-react'
 import { errorMessage, remindersApi } from '../lib/api'
-import { cn, fmtDateTime, isRecurring, recurrenceLabel } from '../lib/utils'
+import { cn, fmtDateTime, groupByBucket, isRecurring, recurrenceLabel } from '../lib/utils'
+import type { ReminderBucket } from '../lib/utils'
 import type { Reminder } from '../types'
 import { Badge, Button, Card, EmptyState, PageHeader, Spinner } from '../components/ui'
 import { ConfirmModal } from '../components/Modal'
 import { ReminderFormModal } from '../components/ReminderFormModal'
 import { useToast } from '../components/Toast'
-
-// Ordena por próxima execução (asc); quem não tem next_execution vai pro fim.
-function byNext(a: Reminder, b: Reminder): number {
-  if (!a.next_execution && !b.next_execution) return 0
-  if (!a.next_execution) return 1
-  if (!b.next_execution) return -1
-  return a.next_execution.localeCompare(b.next_execution)
-}
 
 export default function Reminders() {
   const qc = useQueryClient()
@@ -54,9 +47,10 @@ export default function Reminders() {
     }
   }
 
-  // Ordena tudo e separa: pontuais (once/null) vs recorrentes (o resto).
-  const all = (data?.reminders ?? []).slice().sort(byNext)
-  const pontuais = all.filter((r) => !isRecurring(r))
+  // Igual ao app: pontuais (once/null) e recorrentes, cada um agrupado por data
+  // (Hoje, Amanhã, dia da semana, Semana que vem, mês...).
+  const all = data?.reminders ?? []
+  const pontuais = groupByBucket(all.filter((r) => !isRecurring(r)))
   const recorrentes = all.filter((r) => isRecurring(r))
   const vazio = all.length === 0
 
@@ -94,8 +88,19 @@ export default function Reminders() {
           />
         ) : (
           <div className="pt-1">
-            <Section title="Pontuais" items={pontuais} onEdit={openEdit} onDelete={setToDelete} />
-            <Section title="Recorrentes" items={recorrentes} onEdit={openEdit} onDelete={setToDelete} />
+            {/* pontuais: sem cabeçalho de seção, só os grupos de data */}
+            <Buckets groups={pontuais} onEdit={openEdit} onDelete={setToDelete} />
+
+            {/* recorrentes: divisor "Recorrentes" + os grupos de data deles */}
+            {recorrentes.length > 0 && (
+              <section className={cn(pontuais.length > 0 && 'mt-8 pt-5 border-t border-border')}>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-[15px] font-extrabold text-txt">Recorrentes</h2>
+                  <Count n={recorrentes.length} />
+                </div>
+                <Buckets groups={groupByBucket(recorrentes)} onEdit={openEdit} onDelete={setToDelete} />
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -122,6 +127,33 @@ export default function Reminders() {
   )
 }
 
+// Contador do grupo (bolinha azul com o número), igual ao app.
+function Count({ n }: { n: number }) {
+  return (
+    <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold inline-flex items-center justify-center">
+      {n}
+    </span>
+  )
+}
+
+function Buckets({
+  groups,
+  onEdit,
+  onDelete,
+}: {
+  groups: ReminderBucket[]
+  onEdit: (r: Reminder) => void
+  onDelete: (r: Reminder) => void
+}) {
+  return (
+    <>
+      {groups.map((g) => (
+        <Section key={g.key} title={g.label} items={g.items} onEdit={onEdit} onDelete={onDelete} />
+      ))}
+    </>
+  )
+}
+
 function Section({
   title,
   items,
@@ -133,11 +165,12 @@ function Section({
   onEdit: (r: Reminder) => void
   onDelete: (r: Reminder) => void
 }) {
-  // A seção só aparece se tiver itens.
-  if (items.length === 0) return null
   return (
-    <section className="mb-8 last:mb-0">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-txt-dim mb-3">{title}</h2>
+    <section className="pt-5">
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-txt-dim">{title}</h3>
+        <Count n={items.length} />
+      </div>
       <div className="space-y-2.5">
         <AnimatePresence initial={false} mode="popLayout">
           {items.map((r, i) => (

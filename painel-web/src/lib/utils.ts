@@ -89,6 +89,73 @@ export function isRecurring(r: Pick<Reminder, 'recurrence'>): boolean {
   return !!(r.recurrence && r.recurrence !== 'once')
 }
 
+// Diferença em dias entre duas chaves YYYY-MM-DD.
+function daysBetweenKeys(aKey: string, bKey: string): number {
+  const [ay, am, ad] = aKey.split('-').map(Number)
+  const [by, bm, bd] = bKey.split('-').map(Number)
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000)
+}
+
+// Dia da semana (Seg=0..Dom=6) de uma chave YYYY-MM-DD.
+function weekdayIdx(key: string): number {
+  const [y, m, d] = key.split('-').map(Number)
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+}
+
+export interface ReminderBucket {
+  key: string
+  label: string
+  order: number
+  items: Reminder[]
+}
+
+// Grupo de data do lembrete — o MESMO da tela Lembretes do app (bucketFor do
+// RemindersScreen). Perto: dia exato (Hoje / Amanhã / dia da semana desta
+// semana). Longe: faixas (Semana que vem, Daqui N semanas, Mês que vem, mês).
+function bucketFor(date: Date): Omit<ReminderBucket, 'items'> {
+  const dk = spDateKey(date)
+  const nk = spDateKey(new Date())
+  const diff = daysBetweenKeys(nk, dk)
+  if (diff <= 0) return { key: 'b-hoje', order: 0, label: 'Hoje' }
+  if (diff === 1) return { key: 'b-amanha', order: 1, label: 'Amanhã' }
+
+  const daysLeftThisWeek = 6 - weekdayIdx(nk) // até domingo desta semana
+  if (diff <= daysLeftThisWeek) {
+    const wd = new Intl.DateTimeFormat('pt-BR', { timeZone: SP_TZ, weekday: 'long' }).format(date)
+    return { key: `d-${dk}`, order: 10 + diff, label: cap(wd) }
+  }
+
+  const weeksAhead = Math.ceil((diff - daysLeftThisWeek) / 7)
+  if (weeksAhead === 1) return { key: 'w1', order: 100, label: 'Semana que vem' }
+  if (weeksAhead === 2) return { key: 'w2', order: 101, label: 'Daqui 2 semanas' }
+  if (weeksAhead === 3) return { key: 'w3', order: 102, label: 'Daqui 3 semanas' }
+
+  const [ny, nm] = nk.split('-').map(Number)
+  const [dy, dmo] = dk.split('-').map(Number)
+  const monthsAhead = (dy - ny) * 12 + (dmo - nm)
+  if (monthsAhead <= 1) return { key: 'm1', order: 200, label: 'Mês que vem' }
+  const mn = new Intl.DateTimeFormat('pt-BR', { timeZone: SP_TZ, month: 'long' }).format(date)
+  return { key: `mo-${dy}-${dmo}`, order: 200 + monthsAhead, label: cap(mn) }
+}
+
+// Agrupa pelos grupos de data, em ordem; dentro do grupo, por horário. Sem data
+// vai num grupo próprio no fim.
+export function groupByBucket(reminders: Reminder[]): ReminderBucket[] {
+  const withDate = reminders
+    .filter((r) => r.next_execution)
+    .sort((a, b) => new Date(a.next_execution!).getTime() - new Date(b.next_execution!).getTime())
+  const map: Record<string, ReminderBucket> = {}
+  for (const r of withDate) {
+    const b = bucketFor(new Date(r.next_execution!))
+    if (!map[b.key]) map[b.key] = { ...b, items: [] }
+    map[b.key].items.push(r)
+  }
+  const groups = Object.values(map).sort((a, b) => a.order - b.order)
+  const noDate = reminders.filter((r) => !r.next_execution)
+  if (noDate.length) groups.push({ key: 'nodate', label: 'Sem data', order: Infinity, items: noDate })
+  return groups
+}
+
 // Rótulo de recorrência traduzido (o backend manda recurrence_str em pt, mas
 // montamos aqui pra consistência).
 export function recurrenceLabel(r: Reminder): string {
