@@ -201,12 +201,14 @@ npx expo export --platform web --output-dir dist-web-qa
 
 `painel-web/` é a versão web do app pra usar no PC: chat com a IA, lembretes,
 calendário, tarefas e ajustes num dashboard com menu lateral retrátil, navegação
-animada e layout responsivo. Usa a mesma conta e os mesmos dados do app.
+animada e layout responsivo. Usa a mesma conta e os mesmos dados do app. A lista
+de lembretes é separada por data igual à do app (Hoje, Amanhã, dia da semana,
+Semana que vem, mês...), e clicar num lembrete abre a edição, que também exclui.
 
 Fica **sempre ligado** em http://quase-nada-lembretes.localhost:5178 — um
 servidor Node sem dependências (`serve.mjs`) serve o build e faz o proxy de
-`/api` pro backend, e o `supervisor.vbs` (chamado pela pasta Inicializar do
-Windows) sobe ele no login e re-sobe se cair. O `criar-atalho.ps1` cria o
+`/api` pro backend, e o `supervisor.vbs` (chamado por uma tarefa agendada no
+logon do Windows) sobe ele no login e re-sobe se cair. O `criar-atalho.ps1` cria o
 atalho com ícone que abre o painel como janela de app do Chrome.
 
 ```bash

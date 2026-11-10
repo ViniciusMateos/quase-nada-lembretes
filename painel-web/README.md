@@ -2,7 +2,10 @@
 
 Versão **web** do app, pra rodar local no PC. Mesmas funcionalidades (chat com IA,
 lembretes, calendário, tarefas, ajustes), mas numa cara de **dashboard**: menu
-lateral retrátil, navegação animada, responsivo.
+lateral retrátil, navegação animada, responsivo. A lista de lembretes é separada
+por data com a mesma regra do app (Hoje, Amanhã, dia da semana, Semana que vem,
+Daqui N semanas, Mês que vem, mês por nome), e clicar num lembrete abre a edição,
+que tem o botão de excluir.
 
 Fala com o **mesmo backend** do app (Server 1 `:8000`) — o dev server do Vite faz
 proxy de `/api` e `/health` pra lá, então não tem dor de cabeça com CORS e os dados
