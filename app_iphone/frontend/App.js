@@ -16,7 +16,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { NotificationSettingsProvider } from './src/context/NotificationSettingsContext';
 import { navigationRef } from './src/api/client';
 import AppNavigator from './src/navigation/AppNavigator';
-import { setupNotificationCategories, handleNotificationEvent, scheduleFromSync } from './src/services/notifications';
+import { setupNotificationCategories, handleNotificationEvent, scheduleFromSync, isSnoozeAction } from './src/services/notifications';
 import { syncReminders } from './src/api/reminders.api';
 import { registerBackgroundQueueTask } from './src/services/backgroundTasks';
 
@@ -113,6 +113,8 @@ export default function App() {
   // Cobre também o app matado (getLastNotificationResponseAsync).
   useEffect(() => {
     const rotearPush = resp => {
+      // "Adiar" no push é tratado no index.js (vale até com o app em segundo plano).
+      if (isSnoozeAction(resp?.actionIdentifier)) return;
       const data = resp?.notification?.request?.content?.data || {};
       if (data.reminderId) {
         ativarGate('edit');

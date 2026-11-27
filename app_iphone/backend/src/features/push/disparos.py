@@ -35,12 +35,17 @@ ATRASO_MAX = timedelta(minutes=5)
 # app trabalha em ms; o banco pode guardar microssegundos).
 FOLGA_MS = 2000
 
-# Mesmos textos da notificação local do app (i18n/keys/notifications.js). O
-# disparo troca o "segure para adiar" por "É agora": push não tem a ação de adiar.
+# Categoria de notificação registrada pelo app (CATEGORY_ID em notifications.js):
+# é ela que põe "Adiar 5/10/30 min" ao segurar. Só no disparo; pré-aviso não adia.
+CATEGORIA_LEMBRETE = "lembrete"
+
+# Mesmos textos da notificação local do app (i18n/keys/notifications.js): o push
+# tem que chegar IGUAL ao lembrete normal, inclusive o "segure para adiar" — as
+# ações de adiar vêm da mesma categoria do app (CATEGORIA_LEMBRETE).
 _TEXTOS = {
     "pt": {
         "titulo": "Lembrete: {titulo}",
-        "corpo": "É agora, às {hora}.",
+        "corpo": "segure para adiar",
         "pre_titulo": "Chegando: {titulo}",
         "pre_corpo": "É {quando}, às {hora}.",
         "dia": ("daqui a {n} dia", "daqui a {n} dias"),
@@ -49,7 +54,7 @@ _TEXTOS = {
     },
     "en": {
         "titulo": "Reminder: {titulo}",
-        "corpo": "It's now, at {hora}.",
+        "corpo": "hold to snooze",
         "pre_titulo": "Coming up: {titulo}",
         "pre_corpo": "It's {quando}, at {hora}.",
         "dia": ("in {n} day", "in {n} days"),
@@ -97,7 +102,7 @@ def _textos(lang: str, titulo: str, tipo: str, instante: datetime, alvo: datetim
             txt["pre_titulo"].format(titulo=titulo),
             txt["pre_corpo"].format(quando=quando, hora=hora),
         )
-    return txt["titulo"].format(titulo=titulo), txt["corpo"].format(hora=hora)
+    return txt["titulo"].format(titulo=titulo), txt["corpo"]
 
 
 async def _agendados(db: AsyncSession, user_id: str) -> dict | None:
@@ -208,15 +213,25 @@ async def avisar_disparos(
                 break
             _enviados[chave] = agora
             titulo, corpo = _textos(agendados["lang"], r.title, tipo, instante, alvo)
+            extra = {
+                "priority": "high",
+                "interruptionLevel": "time-sensitive" if agendados["priority"] else "active",
+            }
+            if tipo == "main":
+                extra["categoryId"] = CATEGORIA_LEMBRETE
+            recorrente = bool(r.recurrence) and r.recurrence != "once"
             fire_push(
                 tokens,
                 titulo,
                 corpo,
-                data={"reminderId": r.id, "tipo": "disparo"},
-                sound=SOM_DISPARO,
-                extra={
-                    "priority": "high",
-                    "interruptionLevel": "time-sensitive" if agendados["priority"] else "active",
+                # title/isRecurring: o app adia com eles, igual à notificação local
+                data={
+                    "reminderId": r.id,
+                    "tipo": "disparo",
+                    "title": r.title,
+                    "isRecurring": "1" if recorrente else "0",
                 },
+                sound=SOM_DISPARO,
+                extra=extra,
             )
             logger.info("Push de disparo (%s), o iPhone não tinha agendado: %s", tipo, r.id)

@@ -575,6 +575,37 @@ export async function handleNotificationEvent({ type, detail }) {
   }
 }
 
+// Adiar tocado num PUSH. O push de disparo do backend (lembrete que o iPhone não
+// tinha agendado, ex.: criado no painel web) usa a mesma categoria 'lembrete', então
+// mostra os mesmos "Adiar X min". Só que o notifee só trata as notificações dele:
+// a resposta do push chega pelo expo-notifications. Monta o evento no formato do
+// notifee e reaproveita o handleNotificationEvent. Devolve true se era um adiar.
+const SNOOZE_ACTIONS = [ACTION_SNOOZE_5, ACTION_SNOOZE_10, ACTION_SNOOZE_30];
+const pushesTratados = new Set(); // a mesma resposta chega pelo listener e pela "última resposta"
+
+export const isSnoozeAction = actionId => SNOOZE_ACTIONS.includes(actionId);
+
+export async function handlePushSnoozeResponse(resp) {
+  const actionId = resp?.actionIdentifier;
+  if (!isSnoozeAction(actionId)) return false;
+  const request = resp?.notification?.request;
+  const chave = `${request?.identifier}:${actionId}`;
+  if (pushesTratados.has(chave)) return true;
+  pushesTratados.add(chave);
+
+  const data = request?.content?.data || {};
+  await handleNotificationEvent({
+    type: EventType.ACTION_PRESS,
+    detail: {
+      pressAction: { id: actionId },
+      notification: {
+        data: { reminderId: data.reminderId, title: data.title, isRecurring: data.isRecurring },
+      },
+    },
+  });
+  return true;
+}
+
 // Notificação local imediata (ex.: "Lembrete registrado" quando processado em background,
 // ou confirmações do chat). `silent: true` derruba o som de sistema — usar quando o app
 // já está tocando o som de "received" pela tela.
