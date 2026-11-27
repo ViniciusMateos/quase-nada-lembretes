@@ -578,6 +578,7 @@ Campos opcionais: `name`, `priority`, `notes`, `completed`, `week_key` (semana d
 >
 > - **Lembrete criado pelo chat:** o "lembrete criado" chega mesmo com o app fechado/matado. Em foreground é suprimido (o feedback in-app cobre).
 > - **Na hora do disparo, pro que o iPhone não agendou:** o lembrete toca por notificação local, agendada a cada sync. O que o app ainda não sincronizou (criado no painel web, por ex.) não estava na fila e não tocava. Agora o app informa a fila (`POST /reminders/scheduled`) e o job do backend (a cada 5 s, `push/disparos.py`) manda push dos disparos e pré-avisos vencidos que não estão nela, com o som de lembrete e `data.tipo = "disparo"`. Esse push aparece mesmo com o app aberto. Sem retrato da fila o backend não manda nada, pra não tocar em dobro.
+>   O push do disparo chega **igual à notificação local**: mesmo título, "segure para adiar" e a categoria `lembrete` do app (`categoryId`), que põe o Adiar 5/10/30 min ao segurar. O adiar de um push chega pelo `expo-notifications` (o notifee só trata as notificações dele): o `index.js` repassa pra mesma lógica de adiar da notificação local, inclusive com o app em segundo plano ou matado. Pré-aviso não tem adiar. O texto é montado na hora do envio, então lembretes já criados também saem no formato novo.
 >
 > Qualquer push recebido com o app aberto faz o app sincronizar na hora.
 
