@@ -11,6 +11,16 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.13.1] - 2026-11-27
+
+### Corrigido
+- **Push do disparo chega igual ao lembrete normal, com adiar**: lembrete criado no painel que o iPhone ainda não tinha agendado chegava como "É agora, às..." e sem as ações de adiar. Agora o push vem com o mesmo título, "segure para adiar" e o Adiar 5/10/30 min ao segurar, que funciona igual ao da notificação local (inclusive com o app em segundo plano ou fechado). Vale também pros lembretes que já estavam criados. App no OTA 41.
+
+### Documentação
+- README explica o push de disparo no formato do lembrete normal e o caminho do adiar pelo push.
+
+---
+
 ## [1.13.0] - 2026-11-09
 
 ### Adicionado
